@@ -4,17 +4,21 @@ A tiny Rust CLI that prints a number in multiple representations (bases, ASCII a
 
 ## Install & run
 
-- With Rust installed: `cargo run -- <number>`
-- Add the prefixes `0b` / `0o` / `0x` for binary, octal, and hex. Underscores are allowed for readability (`1_000_000`).
-- `-h` / `--help` shows a brief usage summary.
-- If no argument is provided, it defaults to `1337`.
+- Install once, run anywhere:
+  - `cargo install --path .` (or `cargo install --locked --path .` for reproducible builds)
+  - Then call `number_viewer 42` (defaults to `1337` when no argument is given)
+- Prefer to run without installing? Use `cargo run -- <number>`
+- `-h` / `--help` shows a brief usage summary
+- Prefixes `0b` / `0o` / `0x` select binary, octal, and hex; underscores are fine (`1_000_000`)
 
 ## Examples
 
 ```bash
-cargo run -- 42       # decimal
-cargo run -- 0x2a     # hex
-cargo run -- 0b101010 # binary
+cargo install --path .
+number_viewer 42      # installed binary (preferred)
+cargo run -- 42       # one-off via cargo
+number_viewer 0x2a    # hex
+number_viewer 0b101010 # binary
 ```
 
 Expected output (abridged for `42`):
