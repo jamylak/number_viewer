@@ -1,5 +1,18 @@
 use std::env;
-use std::fmt::Write;
+
+const RESET: &str = "\x1b[0m";
+const BOLD: &str = "\x1b[1m";
+// const DIM: &str = "\x1b[2m";
+const CYAN: &str = "\x1b[36m";
+const MAGENTA: &str = "\x1b[35m";
+const YELLOW: &str = "\x1b[33m";
+const GREEN: &str = "\x1b[32m";
+const BLUE: &str = "\x1b[34m";
+const BIT_ONE: &str = "\x1b[32m#\x1b[0m";
+const BIT_ZERO: &str = "\x1b[2m.\x1b[0m";
+const EDGE_MARK: &str = "\x1b[2m|\x1b[0m";
+const ZERO_MARK: &str = "\x1b[34m|\x1b[0m";
+const POINTER_MARK: &str = "\x1b[33m^\x1b[0m";
 
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
@@ -21,10 +34,10 @@ fn main() {
         None => (default.to_string(), default),
     };
 
-    println!("Number viewer");
-    println!("============\n");
-    println!("Input : {raw}");
-    println!("Value : {number}");
+    println!("{BOLD}{MAGENTA}✨ Number viewer ✨{RESET}");
+    println!("{MAGENTA}============{RESET}\n");
+    println!("🎯 Input : {}", colorize(raw.as_str(), YELLOW));
+    println!("🧾 Value : {}", colorize(number, GREEN));
     println!();
 
     print_bases(number);
@@ -64,37 +77,38 @@ fn print_help() {
 }
 
 fn print_bases(n: i64) {
-    println!("Bases");
-    println!("-----");
-    println!("Decimal : {}", n);
-    println!("Hex     : 0x{:x}", n);
-    println!("Octal   : 0o{:o}", n);
-    println!("Binary  : 0b{:b}", n);
+    section("Bases", "🔢", "-----");
+    println!("Decimal : {}", colorize(n, GREEN));
+    println!("Hex     : {}", colorize(format!("0x{:x}", n), BLUE));
+    println!("Octal   : {}", colorize(format!("0o{o:o}", o = n), YELLOW));
+    println!("Binary  : {}", colorize(format!("0b{:b}", n), CYAN));
 }
 
 fn print_base_e(n: i64) {
     let f = n as f64;
-    println!("Base e flavor");
-    println!("-------------");
-    println!("Scientific (e): {:.6e}", f);
+    section("Base e flavor", "🧮", "-------------");
+    println!("Scientific (e): {}", colorize(format!("{f:.6e}"), BLUE));
     if n != 0 {
         let sign = if n < 0 { "-" } else { "" };
         let magnitude = (n.abs()) as f64;
         let ln_n = magnitude.ln();
         let exponent = ln_n.floor();
         let mantissa = (ln_n - exponent).exp();
-        println!("{n} = {sign}{:.6} * e^{:.6}", mantissa, exponent);
-        println!("ln(|n|) ≈ {:.6}", ln_n);
+        println!(
+            "{n} = {sign}{} * e^{}",
+            colorize(format!("{mantissa:.6}"), GREEN),
+            colorize(format!("{exponent:.6}"), MAGENTA)
+        );
+        println!("ln(|n|) ≈ {}", colorize(format!("{ln_n:.6}"), BLUE));
     } else {
         println!("ln(0) is -infinity; sticking with zero here.");
     }
 }
 
 fn print_ascii_banner(n: i64) {
-    println!("ASCII digits");
-    println!("------------");
+    section("ASCII digits", "🖼️", "------------");
     let banner = ascii_digits(n);
-    println!("{banner}");
+    println!("{BLUE}{banner}{RESET}");
 }
 
 fn ascii_digits(n: i64) -> String {
@@ -134,38 +148,53 @@ fn ascii_digits(n: i64) -> String {
 }
 
 fn print_bits(n: i64) {
-    println!("Bits (32-bit two's complement view)");
-    println!("----------------------------------");
+    section(
+        "Bits (32-bit two's complement view)",
+        "🧠",
+        "----------------------------------",
+    );
     let mut out = String::new();
     for bit in (0..32).rev() {
         if bit % 4 == 3 && bit != 31 {
             out.push(' ');
         }
         let mask = 1_i64 << bit;
-        out.push(if n & mask != 0 { '#' } else { '.' });
+        out.push_str(if n & mask != 0 { BIT_ONE } else { BIT_ZERO });
     }
     println!("{out}");
-    println!("Legend: # = 1, . = 0");
+    println!("Legend: {BIT_ONE} = 1, {BIT_ZERO} = 0");
 }
 
 fn print_meter(n: i64) {
-    println!("Signed meter (relative to i64 range)");
-    println!("------------------------------------");
+    section(
+        "Signed meter (relative to i64 range)",
+        "📏",
+        "------------------------------------",
+    );
     const WIDTH: usize = 48;
     let ratio = (n as f64) / (i64::MAX as f64);
     let pos = (((ratio + 1.0) / 2.0) * (WIDTH as f64)).clamp(0.0, WIDTH as f64);
     let pos_idx = pos.round() as usize;
     let mut bar = String::new();
-    bar.push('|');
+    bar.push_str(EDGE_MARK);
     for i in 0..=WIDTH {
-        if i == WIDTH / 2 {
-            bar.push('|'); // zero marker
-        } else if i == pos_idx {
-            bar.push('^'); // pointer
+        if i == pos_idx {
+            bar.push_str(POINTER_MARK); // pointer
+        } else if i == WIDTH / 2 {
+            bar.push_str(ZERO_MARK); // zero marker
         } else {
             bar.push('-');
         }
     }
-    bar.push('|');
+    bar.push_str(EDGE_MARK);
     println!("{bar}");
+}
+
+fn section(title: &str, emoji: &str, underline: &str) {
+    println!("{BOLD}{CYAN}{emoji} {title}{RESET}");
+    println!("{CYAN}{underline}{RESET}");
+}
+
+fn colorize<T: std::fmt::Display>(value: T, color: &str) -> String {
+    format!("{color}{value}{RESET}")
 }
