@@ -21,29 +21,45 @@ number_viewer 0x2a    # hex
 number_viewer 0b101010 # binary
 ```
 
-Expected output (abridged for `42`):
+Expected output (abridged for `0x80999`):
 
 ```
+❯ number_viewer 0x80999
 ✨ Number viewer ✨
-============ 
+============
 
-🎯 Input : 42
-🧾 Value : 42
+🎯 Input : 0x80999
+🧾 Value : 526745
 
 🔢 Bases
 -----
-Decimal : 42
-Hex     : 0x2a
-Octal   : 0o52
-Binary  : 0b101010
+Decimal : 526745
+Hex     : 0x80999
+Octal   : 0o2004631
+Binary  : 0b10000000100110011001
+
+🧮 Base e flavor
+-------------
+Scientific (e): 5.267450e5
+526745 = 1.190617 * e^13.000000
+ln(|n|) ≈ 13.174472
 
 🖼️ ASCII digits
 ------------
- ### 
-#   #
-#####
-#   #
- ### 
+#####  ###   ###  ##### #   # #####
+#     #   # #         # #   # #    
+####     #  ####     #  ##### #### 
+    #   #   #   #   #       #     #
+####  #####  ###    #       # #### 
+
+🧠 Bits (32-bit two's complement view)
+----------------------------------
+.... .... .... #... .... #..# #..# #..#
+Legend: # = 1, . = 0
+
+📏 Signed meter (relative to i64 range)
+------------------------------------
+|------------------------^------------------------|
 ```
 
 The full output also includes:
