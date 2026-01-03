@@ -2,7 +2,7 @@ use std::env;
 
 const RESET: &str = "\x1b[0m";
 const BOLD: &str = "\x1b[1m";
-// const DIM: &str = "\x1b[2m";
+const DIM: &str = "\x1b[37m";
 const CYAN: &str = "\x1b[36m";
 const MAGENTA: &str = "\x1b[35m";
 const YELLOW: &str = "\x1b[33m";
@@ -31,27 +31,44 @@ fn main() {
                 std::process::exit(1);
             }
         },
-        None => (default.to_string(), default),
+        None => (default.to_string(), Number::Int(default)),
     };
 
     println!("{BOLD}{MAGENTA}✨ Number viewer ✨{RESET}");
     println!("{MAGENTA}============{RESET}\n");
     println!("🎯 Input : {}", colorize(raw.as_str(), YELLOW));
-    println!("🧾 Value : {}", colorize(number, GREEN));
+    match number {
+        Number::Int(n) => println!("🧾 Value : {}", colorize(n, GREEN)),
+        Number::Float(f) => println!("🧾 Value : {}", colorize(format!("{f}"), GREEN)),
+    }
     println!();
 
-    print_bases(number);
-    println!();
-    print_base_e(number);
-    println!();
-    print_ascii_banner(number);
-    println!();
-    print_bits(number);
-    println!();
-    print_meter(number);
+    match number {
+        Number::Int(n) => {
+            print_bases(n);
+            println!();
+            print_base_e(n);
+            println!();
+            print_ascii_banner(n);
+            println!();
+            print_bits(n);
+            println!();
+            print_meter(n);
+        }
+        Number::Float(f) => {
+            print_float_overview(f);
+            println!();
+            print_float_bits(f);
+        }
+    }
 }
 
-fn parse_number(raw: &str) -> Result<i64, String> {
+enum Number {
+    Int(i64),
+    Float(f64),
+}
+
+fn parse_number(raw: &str) -> Result<Number, String> {
     let cleaned: String = raw.chars().filter(|c| *c != '_').collect();
     let s = cleaned.as_str();
     let (base, digits) = if let Some(rest) = s.strip_prefix("0b") {
@@ -61,18 +78,34 @@ fn parse_number(raw: &str) -> Result<i64, String> {
     } else if let Some(rest) = s.strip_prefix("0x") {
         (16, rest)
     } else {
+        if looks_float(s) {
+            return s
+                .parse::<f64>()
+                .map(Number::Float)
+                .map_err(|e| format!("invalid float: {e}"));
+        }
+
+        if let Ok(n) = s.parse::<i64>() {
+            return Ok(Number::Int(n));
+        }
+
         return s
-            .parse::<i64>()
+            .parse::<f64>()
+            .map(Number::Float)
             .map_err(|e| format!("invalid decimal: {e}"));
     };
 
-    i64::from_str_radix(digits, base).map_err(|e| format!("invalid base {base}: {e}"))
+    i64::from_str_radix(digits, base)
+        .map(Number::Int)
+        .map_err(|e| format!("invalid base {base}: {e}"))
 }
 
 fn print_help() {
     println!("Usage: number_viewer [NUMBER]");
     println!("Show a number in multiple bases plus some ASCII visuals.");
-    println!("Accepted forms: decimal (42), binary (0b1010), octal (0o52), hex (0x2a).");
+    println!(
+        "Accepted forms: decimal (42), float (3.14, -2e5), binary (0b1010), octal (0o52), hex (0x2a)."
+    );
     println!("If omitted, defaults to 1337.");
 }
 
@@ -103,6 +136,139 @@ fn print_base_e(n: i64) {
     } else {
         println!("ln(0) is -infinity; sticking with zero here.");
     }
+}
+
+fn print_float_overview(f: f64) {
+    section("Float value", "🧪", "-----------");
+    println!("Decimal    : {}", colorize(format!("{f}"), GREEN));
+    println!("Scientific : {}", colorize(format!("{f:.6e}"), BLUE));
+    println!("Hex bits   : {}", colorize(format!("0x{:016x}", f.to_bits()), MAGENTA));
+}
+
+fn print_float_bits(f: f64) {
+    section("Float internals (IEEE 754 f64)", "🧬", "------------------------------");
+    let bits = f.to_bits();
+    let sign_bit = (bits >> 63) & 1;
+    let exponent = (bits >> 52) & 0x7ff;
+    let fraction = bits & ((1_u64 << 52) - 1);
+
+    let mut out = String::new();
+    for bit in (0..64).rev() {
+        let is_one = (bits >> bit) & 1 == 1;
+        out.push_str(if is_one { BIT_ONE } else { BIT_ZERO });
+        if bit == 63 || bit == 52 {
+            out.push_str(EDGE_MARK);
+        } else if bit % 4 == 0 {
+            out.push(' ');
+        }
+    }
+    println!("{out}");
+    println!("Legend: sign|exponent|fraction");
+
+    let sign = if sign_bit == 0 { "+" } else { "-" };
+    let category = match f.classify() {
+        std::num::FpCategory::Nan => "NaN",
+        std::num::FpCategory::Infinite => "Infinity",
+        std::num::FpCategory::Zero => "Zero",
+        std::num::FpCategory::Subnormal => "Subnormal",
+        std::num::FpCategory::Normal => "Normal",
+    };
+
+    println!("Sign      : {}", colorize(sign, YELLOW));
+    println!("Category  : {}", colorize(category, CYAN));
+    println!(
+        "Exponent  : {} (biased)",
+        colorize(format!("{exponent}"), GREEN)
+    );
+    println!(
+        "Fraction  : {}",
+        colorize(format!("0x{fraction:013x}"), BLUE)
+    );
+
+    let sign_power = if sign_bit == 0 { 0 } else { 1 };
+    match category {
+        "Normal" => {
+            let exponent_unbiased = (exponent as i32) - 1023;
+            let frac_value = (fraction as f64) / (1_u64 << 52) as f64;
+            let mantissa = 1.0 + frac_value;
+            println!(
+                "Exponent  : {} (unbiased)",
+                colorize(format!("{exponent_unbiased}"), MAGENTA)
+            );
+            println!(
+                "Mantissa  : {}",
+                colorize(format!("{mantissa:.12}"), GREEN)
+            );
+            println!(
+                "Value form: {dim}(-1){reset}{sign} {dim}× (1 +{reset} {mant} {dim}) × 2{reset}{exp}",
+                dim = DIM,
+                reset = RESET,
+                sign = colorize(superscript_int(sign_power), YELLOW),
+                mant = colorize(format!("{frac_value:.12}"), GREEN),
+                exp = colorize(superscript_int(exponent_unbiased), MAGENTA)
+            );
+        }
+        "Subnormal" => {
+            let exponent_unbiased = -1022;
+            let mantissa = (fraction as f64) / (1_u64 << 52) as f64;
+            println!(
+                "Exponent  : {} (unbiased)",
+                colorize(format!("{exponent_unbiased}"), MAGENTA)
+            );
+            println!(
+                "Mantissa  : {}",
+                colorize(format!("{mantissa:.12}"), GREEN)
+            );
+            println!(
+                "Value form: {dim}(-1){reset}{sign} {dim}× (0 +{reset} {mant} {dim}) × 2{reset}{exp}",
+                dim = DIM,
+                reset = RESET,
+                sign = colorize(superscript_int(sign_power), YELLOW),
+                mant = colorize(format!("{mantissa:.12}"), GREEN),
+                exp = colorize(superscript_int(exponent_unbiased), MAGENTA)
+            );
+        }
+        "Zero" => {
+            println!(
+                "Value form: {dim}(-1){reset}{sign} {dim}× 0{reset}",
+                dim = DIM,
+                reset = RESET,
+                sign = colorize(superscript_int(sign_power), YELLOW)
+            );
+        }
+        "Infinity" => {
+            println!(
+                "Value form: {dim}(-1){reset}{sign} {dim}× Infinity{reset}",
+                dim = DIM,
+                reset = RESET,
+                sign = colorize(superscript_int(sign_power), YELLOW)
+            );
+        }
+        _ => {
+            println!("Value form: {}", colorize("NaN", MAGENTA));
+        }
+    }
+}
+
+fn superscript_int(n: i32) -> String {
+    let mut out = String::new();
+    for ch in n.to_string().chars() {
+        out.push(match ch {
+            '-' => '⁻',
+            '0' => '⁰',
+            '1' => '¹',
+            '2' => '²',
+            '3' => '³',
+            '4' => '⁴',
+            '5' => '⁵',
+            '6' => '⁶',
+            '7' => '⁷',
+            '8' => '⁸',
+            '9' => '⁹',
+            _ => ch,
+        });
+    }
+    out
 }
 
 fn print_ascii_banner(n: i64) {
@@ -197,4 +363,15 @@ fn section(title: &str, emoji: &str, underline: &str) {
 
 fn colorize<T: std::fmt::Display>(value: T, color: &str) -> String {
     format!("{color}{value}{RESET}")
+}
+
+fn looks_float(s: &str) -> bool {
+    if s.contains('.') || s.contains('e') || s.contains('E') {
+        return true;
+    }
+    let trimmed = s.trim_start_matches(['+', '-']);
+    matches!(
+        trimmed.to_ascii_lowercase().as_str(),
+        "nan" | "inf" | "infinity"
+    )
 }
