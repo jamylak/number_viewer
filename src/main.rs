@@ -375,3 +375,76 @@ fn looks_float(s: &str) -> bool {
         "nan" | "inf" | "infinity"
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_number_handles_base_prefixes() {
+        match parse_number("0b1010").expect("binary parse") {
+            Number::Int(n) => assert_eq!(n, 10),
+            _ => panic!("expected int"),
+        }
+
+        match parse_number("0o52").expect("octal parse") {
+            Number::Int(n) => assert_eq!(n, 42),
+            _ => panic!("expected int"),
+        }
+
+        match parse_number("0x2a").expect("hex parse") {
+            Number::Int(n) => assert_eq!(n, 42),
+            _ => panic!("expected int"),
+        }
+    }
+
+    #[test]
+    fn parse_number_allows_underscores() {
+        match parse_number("1_234_567").expect("underscore parse") {
+            Number::Int(n) => assert_eq!(n, 1_234_567),
+            _ => panic!("expected int"),
+        }
+    }
+
+    #[test]
+    fn parse_number_detects_float_forms() {
+        match parse_number("3.14").expect("float parse") {
+            Number::Float(f) => assert!((f - 3.14).abs() < f64::EPSILON),
+            _ => panic!("expected float"),
+        }
+
+        match parse_number("-2e5").expect("scientific parse") {
+            Number::Float(f) => assert_eq!(f, -200_000.0),
+            _ => panic!("expected float"),
+        }
+    }
+
+    #[test]
+    fn looks_float_recognizes_keywords_and_symbols() {
+        assert!(looks_float("nan"));
+        assert!(looks_float("INF"));
+        assert!(looks_float("-infinity"));
+        assert!(looks_float("1.0"));
+        assert!(looks_float("1e3"));
+        assert!(!looks_float("42"));
+    }
+
+    #[test]
+    fn ascii_digits_renders_minus_and_digits() {
+        let banner = ascii_digits(-10);
+        let expected = [
+            "        #    ### ",
+            " ---   ##   #   #",
+            "        #   #   #",
+            "        #   #   #",
+            "       ###   ### ",
+        ]
+        .join("\n");
+        assert_eq!(banner, expected);
+    }
+
+    #[test]
+    fn superscript_int_formats_negative_numbers() {
+        assert_eq!(superscript_int(-1023), "⁻¹⁰²³");
+    }
+}
