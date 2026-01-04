@@ -64,8 +64,7 @@ Legend: # = 1, . = 0
 |------------------------^------------------------|
 ```
 
-Float output example (abridged for `3.14159`):
-
+Float example `3.14159`
 ```
 ❯ number_viewer 3.14159
 ✨ Number viewer ✨
@@ -82,15 +81,15 @@ Hex bits   : 0x400921f9f01b866e
 
 🧬 Float internals (IEEE 754 f64)
 ------------------------------
-#|.... .... .... .... .... .... .... .... .... .... .... .... .... .... .... ....
+.|#.. .... ....|#..# ..#. ...# #### #..# #### .... ...# #.## #... .##. .##. ###. 
 Legend: sign|exponent|fraction
 Sign      : +
 Category  : Normal
 Exponent  : 1024 (biased)
 Fraction  : 0x921f9f01b866e
 Exponent  : 1 (unbiased)
-Mantissa  : 1.570795
-Value form: (-1)⁰ × (1 + 0.570795) × 2¹
+Mantissa  : 1.570795000000
+Value form: (-1)⁰ × (1 + 0.570795000000 ) × 2¹
 ```
 
 The full output also includes:
