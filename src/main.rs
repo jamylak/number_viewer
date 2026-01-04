@@ -146,7 +146,21 @@ fn print_float_overview(f: f64) {
 }
 
 fn print_float_bits(f: f64) {
-    section("Float internals (IEEE 754 f64)", "🧬", "------------------------------");
+    print!("{}", float_bits_output(f));
+}
+
+fn float_bits_output(f: f64) -> String {
+    use std::fmt::Write;
+
+    let mut output = String::new();
+    writeln!(
+        output,
+        "{BOLD}{CYAN}🧬 Float internals (IEEE 754 f64){RESET}"
+    )
+    .expect("write header");
+    writeln!(output, "{CYAN}------------------------------{RESET}")
+        .expect("write underline");
+
     let bits = f.to_bits();
     let sign_bit = (bits >> 63) & 1;
     let exponent = (bits >> 52) & 0x7ff;
@@ -162,8 +176,8 @@ fn print_float_bits(f: f64) {
             out.push(' ');
         }
     }
-    println!("{out}");
-    println!("Legend: sign|exponent|fraction");
+    writeln!(output, "{out}").expect("write bits");
+    writeln!(output, "Legend: sign|exponent|fraction").expect("write legend");
 
     let sign = if sign_bit == 0 { "+" } else { "-" };
     let category = match f.classify() {
@@ -174,16 +188,20 @@ fn print_float_bits(f: f64) {
         std::num::FpCategory::Normal => "Normal",
     };
 
-    println!("Sign      : {}", colorize(sign, YELLOW));
-    println!("Category  : {}", colorize(category, CYAN));
-    println!(
+    writeln!(output, "Sign      : {}", colorize(sign, YELLOW)).expect("write sign");
+    writeln!(output, "Category  : {}", colorize(category, CYAN)).expect("write category");
+    writeln!(
+        output,
         "Exponent  : {} (biased)",
         colorize(format!("{exponent}"), GREEN)
-    );
-    println!(
+    )
+    .expect("write exponent biased");
+    writeln!(
+        output,
         "Fraction  : {}",
         colorize(format!("0x{fraction:013x}"), BLUE)
-    );
+    )
+    .expect("write fraction");
 
     let sign_power = if sign_bit == 0 { 0 } else { 1 };
     match category {
@@ -191,63 +209,82 @@ fn print_float_bits(f: f64) {
             let exponent_unbiased = (exponent as i32) - 1023;
             let frac_value = (fraction as f64) / (1_u64 << 52) as f64;
             let mantissa = 1.0 + frac_value;
-            println!(
+            writeln!(
+                output,
                 "Exponent  : {} (unbiased)",
                 colorize(format!("{exponent_unbiased}"), MAGENTA)
-            );
-            println!(
+            )
+            .expect("write exponent unbiased");
+            writeln!(
+                output,
                 "Mantissa  : {}",
                 colorize(format!("{mantissa:.12}"), GREEN)
-            );
-            println!(
+            )
+            .expect("write mantissa");
+            writeln!(
+                output,
                 "Value form: {dim}(-1){reset}{sign} {dim}× (1 +{reset} {mant} {dim}) × 2{reset}{exp}",
                 dim = DIM,
                 reset = RESET,
                 sign = colorize(superscript_int(sign_power), YELLOW),
                 mant = colorize(format!("{frac_value:.12}"), GREEN),
                 exp = colorize(superscript_int(exponent_unbiased), MAGENTA)
-            );
+            )
+            .expect("write value form");
         }
         "Subnormal" => {
             let exponent_unbiased = -1022;
             let mantissa = (fraction as f64) / (1_u64 << 52) as f64;
-            println!(
+            writeln!(
+                output,
                 "Exponent  : {} (unbiased)",
                 colorize(format!("{exponent_unbiased}"), MAGENTA)
-            );
-            println!(
+            )
+            .expect("write exponent unbiased");
+            writeln!(
+                output,
                 "Mantissa  : {}",
                 colorize(format!("{mantissa:.12}"), GREEN)
-            );
-            println!(
+            )
+            .expect("write mantissa");
+            writeln!(
+                output,
                 "Value form: {dim}(-1){reset}{sign} {dim}× (0 +{reset} {mant} {dim}) × 2{reset}{exp}",
                 dim = DIM,
                 reset = RESET,
                 sign = colorize(superscript_int(sign_power), YELLOW),
                 mant = colorize(format!("{mantissa:.12}"), GREEN),
                 exp = colorize(superscript_int(exponent_unbiased), MAGENTA)
-            );
+            )
+            .expect("write value form");
         }
         "Zero" => {
-            println!(
+            writeln!(
+                output,
                 "Value form: {dim}(-1){reset}{sign} {dim}× 0{reset}",
                 dim = DIM,
                 reset = RESET,
                 sign = colorize(superscript_int(sign_power), YELLOW)
-            );
+            )
+            .expect("write value form");
         }
         "Infinity" => {
-            println!(
+            writeln!(
+                output,
                 "Value form: {dim}(-1){reset}{sign} {dim}× Infinity{reset}",
                 dim = DIM,
                 reset = RESET,
                 sign = colorize(superscript_int(sign_power), YELLOW)
-            );
+            )
+            .expect("write value form");
         }
         _ => {
-            println!("Value form: {}", colorize("NaN", MAGENTA));
+            writeln!(output, "Value form: {}", colorize("NaN", MAGENTA))
+                .expect("write value form");
         }
     }
+
+    output
 }
 
 fn superscript_int(n: i32) -> String {
@@ -380,6 +417,26 @@ fn looks_float(s: &str) -> bool {
 mod tests {
     use super::*;
 
+    fn strip_ansi_codes(input: &str) -> String {
+        let mut out = String::with_capacity(input.len());
+        let mut chars = input.chars().peekable();
+        while let Some(ch) = chars.next() {
+            if ch == '\u{1b}' {
+                if matches!(chars.peek(), Some('[')) {
+                    chars.next();
+                    while let Some(next) = chars.next() {
+                        if next == 'm' {
+                            break;
+                        }
+                    }
+                    continue;
+                }
+            }
+            out.push(ch);
+        }
+        out
+    }
+
     #[test]
     fn parse_number_handles_base_prefixes() {
         match parse_number("0b1010").expect("binary parse") {
@@ -446,5 +503,18 @@ mod tests {
     #[test]
     fn superscript_int_formats_negative_numbers() {
         assert_eq!(superscript_int(-1023), "⁻¹⁰²³");
+    }
+
+    #[test]
+    fn float_bits_output_reports_mantissa_and_exponent() {
+        let output = float_bits_output(3.5);
+        let cleaned = strip_ansi_codes(&output);
+
+        assert!(cleaned.contains("Float internals (IEEE 754 f64)"));
+        assert!(cleaned.contains("Exponent  : 1 (unbiased)"));
+        assert!(cleaned.contains("Mantissa  : 1.750000000000"));
+        assert!(cleaned.contains("Value form:"));
+        assert!(cleaned.contains("0.750000000000"));
+        assert!(cleaned.contains("2¹"));
     }
 }
