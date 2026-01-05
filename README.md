@@ -14,6 +14,8 @@ A tiny Rust CLI that prints a number in multiple representations (bases, ASCII a
 
 ## Examples
 
+![float_output.png](assets/float_output.png)
+
 ```bash
 cargo install --path .
 number_viewer 42      # installed binary (preferred)
