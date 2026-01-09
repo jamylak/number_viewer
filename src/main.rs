@@ -551,4 +551,45 @@ mod tests {
             _ => panic!("expected float"),
         }
     }
+
+    #[test]
+    fn parse_number_handles_huge_decimal_overflow() {
+        // Huge number in decimal format (not scientific notation) should overflow to infinity
+        let huge = "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999.0";
+        match parse_number(huge).expect("huge decimal parse") {
+            Number::Float(f) => {
+                assert!(f.is_infinite());
+                assert!(f.is_sign_positive());
+            }
+            _ => panic!("expected float"),
+        }
+    }
+
+    #[test]
+    fn parse_number_handles_large_decimal_with_many_fractional_digits() {
+        // Number with many fractional digits should parse and round appropriately
+        let many_digits = "90.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001";
+        match parse_number(many_digits).expect("many fractional digits parse") {
+            Number::Float(f) => {
+                // Due to f64 precision, this rounds to 90.0
+                assert!(f.is_finite());
+                assert_eq!(f, 90.0);
+            }
+            _ => panic!("expected float"),
+        }
+    }
+
+    #[test]
+    fn parse_number_handles_large_decimal_within_range() {
+        // Large number in decimal format that fits within f64 range
+        let large = "999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999.0";
+        match parse_number(large).expect("large decimal parse") {
+            Number::Float(f) => {
+                assert!(f.is_finite());
+                assert!(f > 0.0);
+                assert_eq!(f.classify(), std::num::FpCategory::Normal);
+            }
+            _ => panic!("expected float"),
+        }
+    }
 }
