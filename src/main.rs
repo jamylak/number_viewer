@@ -447,4 +447,149 @@ mod tests {
     fn superscript_int_formats_negative_numbers() {
         assert_eq!(superscript_int(-1023), "⁻¹⁰²³");
     }
+
+    #[test]
+    fn parse_number_handles_positive_infinity() {
+        // Value above f64::MAX should parse as infinity
+        match parse_number("1e309").expect("positive infinity parse") {
+            Number::Float(f) => {
+                assert!(f.is_infinite());
+                assert!(f.is_sign_positive());
+            }
+            _ => panic!("expected float"),
+        }
+    }
+
+    #[test]
+    fn parse_number_handles_negative_infinity() {
+        // Value below -f64::MAX should parse as negative infinity
+        match parse_number("-1e309").expect("negative infinity parse") {
+            Number::Float(f) => {
+                assert!(f.is_infinite());
+                assert!(f.is_sign_negative());
+            }
+            _ => panic!("expected float"),
+        }
+    }
+
+    #[test]
+    fn parse_number_handles_nan() {
+        match parse_number("nan").expect("nan parse") {
+            Number::Float(f) => assert!(f.is_nan()),
+            _ => panic!("expected float"),
+        }
+    }
+
+    #[test]
+    fn parse_number_handles_inf_keyword() {
+        match parse_number("inf").expect("inf parse") {
+            Number::Float(f) => {
+                assert!(f.is_infinite());
+                assert!(f.is_sign_positive());
+            }
+            _ => panic!("expected float"),
+        }
+    }
+
+    #[test]
+    fn parse_number_handles_negative_infinity_keyword() {
+        match parse_number("-infinity").expect("-infinity parse") {
+            Number::Float(f) => {
+                assert!(f.is_infinite());
+                assert!(f.is_sign_negative());
+            }
+            _ => panic!("expected float"),
+        }
+    }
+
+    #[test]
+    fn parse_number_handles_smallest_positive_subnormal() {
+        // Smallest positive subnormal value
+        match parse_number("5e-324").expect("smallest subnormal parse") {
+            Number::Float(f) => {
+                assert!(f > 0.0);
+                assert_eq!(f.classify(), std::num::FpCategory::Subnormal);
+            }
+            _ => panic!("expected float"),
+        }
+    }
+
+    #[test]
+    fn parse_number_handles_largest_normal_float() {
+        // Largest finite f64 value
+        let max_str = "1.7976931348623157e308";
+        match parse_number(max_str).expect("max float parse") {
+            Number::Float(f) => {
+                assert!(f.is_finite());
+                assert!(f > 0.0);
+                assert_eq!(f.classify(), std::num::FpCategory::Normal);
+            }
+            _ => panic!("expected float"),
+        }
+    }
+
+    #[test]
+    fn parse_number_handles_positive_zero() {
+        match parse_number("0.0").expect("positive zero parse") {
+            Number::Float(f) => {
+                assert_eq!(f, 0.0);
+                assert!(f.is_sign_positive());
+                assert_eq!(f.classify(), std::num::FpCategory::Zero);
+            }
+            _ => panic!("expected float"),
+        }
+    }
+
+    #[test]
+    fn parse_number_handles_negative_zero() {
+        match parse_number("-0.0").expect("negative zero parse") {
+            Number::Float(f) => {
+                assert_eq!(f, 0.0); // -0.0 == 0.0
+                assert!(f.is_sign_negative());
+                assert_eq!(f.classify(), std::num::FpCategory::Zero);
+            }
+            _ => panic!("expected float"),
+        }
+    }
+
+    #[test]
+    fn parse_number_handles_huge_decimal_overflow() {
+        // Huge number in decimal format (not scientific notation) should overflow to infinity
+        let huge = "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999.0";
+        match parse_number(huge).expect("huge decimal parse") {
+            Number::Float(f) => {
+                assert!(f.is_infinite());
+                assert!(f.is_sign_positive());
+            }
+            _ => panic!("expected float"),
+        }
+    }
+
+    #[test]
+    fn parse_number_handles_large_decimal_with_many_fractional_digits() {
+        // Number with many fractional digits should parse and round appropriately
+        let many_digits = "90.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001";
+        match parse_number(many_digits).expect("many fractional digits parse") {
+            Number::Float(f) => {
+                // Due to f64 precision, this rounds to 90.0
+                assert!(f.is_finite());
+                assert_eq!(f, 90.0);
+            }
+            _ => panic!("expected float"),
+        }
+    }
+
+    #[test]
+    fn parse_number_handles_large_decimal_within_range() {
+        // Large number in decimal format that fits within f64 range
+        let large = "999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999.0";
+        match parse_number(large).expect("large decimal parse") {
+            Number::Float(f) => {
+                assert!(f.is_finite());
+                assert!(f > 0.0);
+                assert_eq!(f.classify(), std::num::FpCategory::Normal);
+            }
+            _ => panic!("expected float"),
+        }
+    }
 }
